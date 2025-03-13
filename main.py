@@ -1186,3 +1186,168 @@ setup_admin()
 setup_database()
 print("Your bot is running")
 bot.infinity_polling(skip_pending= True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+get_manga = False
+get_manga_nom = False
+manga_del = False
+manga_change = False
+manga_kod = get_last_kod()[0]
+file_n_manga: str = ""
+
+@bot.message_handler(func = lambda message: message.text == "🎥Manga sozlash" and is_admin(message.chat.id))
+def create_keyboard_of_anime_change(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item_st = types.KeyboardButton("❇️Manga qo'shish")
+    item_xy = types.KeyboardButton("🗑Manga o'chrish")
+    item_pt = types.KeyboardButton("🔱O'zgartirish")
+    item_ls = types.KeyboardButton("📃Manga ro'yhati")
+    item_bc = types.KeyboardButton("◀️Orqaga")
+
+    markup.row(item_st, item_xy)
+    markup.row(item_pt,item_ls)
+    markup.row(item_bc)
+
+    bot.send_message(message.chat.id, "Manga Sozlash bo'limi!", reply_markup= markup)
+
+@bot.message_handler(func = lambda message: message.text == "❇️Manga qo'shish" and is_admin(message.chat.id))
+def add_anime(message):
+    global get_manga_nom, manga_kod
+    get_anime_nom = True
+    anime_kod += 1
+    bot.send_message(message.chat.id , "📃Ok, yuklamoqchi bo'lgan Manganing nomini tashlang...")
+
+@bot.message_handler(func = lambda message: get_anime_nom and is_admin(message.chat.id))
+def get_file_name(message):
+    global file_n_manga, get_manga, get_manga_nom
+    file_n = message.text
+    get_anime = True
+    get_anime_nom = False
+    bot.send_message(message.chat.id , "🖼Ok, yuklamoqchi bo'lgan manganing suratini tashlang.")
+
+
+@bot.message_handler(content_types=['photo', 'video'], func = lambda message: get_manga and is_admin(message.chat.id))
+def handle_file_upload(message):
+    global manga_kod, file_n_manga
+    if message.photo:
+        file_id = message.photo[-1].file_id  # Get the largest photo
+        file_type = 'photo'
+        bot.send_message(message.chat.id, "🎥Ok, yuklamoqchi bo'lgan manga qismlarini tartib bo'yicha tashlang (1 -> 12)")
+    elif message.video:
+        file_id = message.video.file_id
+        file_type = 'video'
+    else:
+        bot.reply_to(message, "⛔️Unsupported file type.")
+        return
+
+    # Save file metadata to database
+    save_file(anime_kod, file_id, file_n,file_type)
+
+    bot.reply_to(message, f"✅{file_type.capitalize()} saved successfully!")
+
+@bot.message_handler(func= lambda message: message.text == "🗑Anime o'chrish" and is_admin(message.chat.id))
+def del_anime(message):
+    global manga_del
+    manga_del = True
+    roy = show_anime_list()
+    m = ""
+    for i in roy:
+        m += (i + "\n")
+    bot.send_message(message.chat.id, m)
+    bot.send_message(message.chat.id, "O'chirmoqchi bo'lgan manga kodini kiriting...")
+
+@bot.message_handler(func= lambda message: is_admin(message.chat.id) and anime_del)
+def delete_anime_from_anime_list(message):
+    global manga_del
+    manga_del = False
+    try:
+        kod = int(message.text)
+        conn = sqlite3.connect("bot_users.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM files WHERE file_kod = ?", (kod,))
+        conn.commit()
+        bot.send_message(message.chat.id, "✅Anime muvaffaqiyatli o'chirildi")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"⛔️Tizimda xatolik yuz berdi: {e}")
+
+
+add_ep_bool1_managa = False
+add_ep_bool2_manga = False
+ep_num_manga: int = 0
+an_name_manga: str = "Unknown"
+
+
+@bot.callback_query_handler(func= lambda call: call.data == "ep_anime_manga")
+def change_manga_ep(call):
+    global add_ep_bool1_manga
+    roy = show_anime_list()
+    m = ""
+    for i in roy:
+        m += (i + "\n")
+    bot.send_message(call.message.chat.id, m)
+    bot.send_message(call.message.chat.id, "Qism qo'shiladigan manga kodini kiriting...")
+    add_ep_bool1_manga = True
+
+@bot.message_handler(func= lambda message: is_admin(message.chat.id) and add_ep_bool1_manga)
+def add_episode(message):
+    global ep_num_man, an_name, add_ep_bool1, add_ep_bool2
+    conn = sqlite3.connect("bot_users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT file_kod, file_name FROM files")
+    eplist = cursor.fetchall()
+    for i in eplist:
+        if int(i[0]) == int(message.text):
+            an_name_manga = i[1]
+            break
+    if an_name_manga == "Unknown":
+        bot.send_message(message.chat.id,"Siz mavjud bo'lmagan kod kiritingiz!")
+    else:
+        ep_num_manga = message.text
+        add_ep_bool2_manga00 = True
+        bot.send_message(message.chat.id, f"🎥Ok, {an_name} animesiga yuklamoqchi bo'lgan qismni/larni tartib bo'yicha tashlang...")
+    add_ep_bool1 = False
+
+@bot.message_handler(content_types=['video'], func = lambda message: add_ep_bool2 and is_admin(message.chat.id))
+def handle_file_upload(message):
+    global ep_num,an_name
+    if message.video:
+        file_id = message.video.file_id
+        file_type = 'video'
+    else:
+        bot.reply_to(message, "⛔️Unsupported file type.")
+        return
+
+    # Save file metadata to database
+    save_file(ep_num, file_id, an_name,file_type)
+
+    bot.reply_to(message, f"✅{file_type.capitalize()} saved successfully!")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
